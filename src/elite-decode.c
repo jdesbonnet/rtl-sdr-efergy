@@ -133,7 +133,11 @@ int main (int argc, char**argv) {
 
 	
 		//
-		// Read frame
+		// Read frame. From previous analysis 
+		// ( http://jdesbonnet.blogspot.ie/2010/09/smart-electricity-meter-based-on-efergy.html ) 
+		// each symbol is 2ms in duration.
+		// logic 0: 3 cycles of 1500Hz
+		// logic 1: 4 cycles of 2000Hz
 		//
 
 		bit_count = 0;
@@ -145,8 +149,17 @@ int main (int argc, char**argv) {
 
 		while ( !feof(stdin) ) {
 
+			
+			// logic 0: 1500Hz = 64samples @ 96ksps
+			// logic 1: 2000Hz = 48 samples @ 96ksps
+
+			// Duration of positive half cycle, so /2.
+			// ie ~ 32 and ~24
 			v = get_next_sample();
 		
+
+			// TODO: make sample rate independent.
+
 			//if ( v>=((13*SAMPLE_RATE)/48000)  &&  v <= ((17*SAMPLE_RATE)/48000) ) {
 			if ( v>=32  &&  v <= 34 ) {
 				freq=0;
