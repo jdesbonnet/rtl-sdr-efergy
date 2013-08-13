@@ -15,7 +15,7 @@ rtl_fm -f 433.55M -W -s 200000 -r 96000 - | ./elite-decode -r 96000 > electricit
 Debug info will go to the screen, and power use (current in mA) will be channeled
 to stdout. You can plot in gnuplot with the following gnuplot script:
 
-
+```
 set title "Electricity use chart"
 set grid
 set xlabel "Time"
@@ -26,7 +26,7 @@ set format x "%R"   # Display time in 24 hour notation on the X axis
 set terminal png
 set output 'electricity.png'
 plot 'electricity.dat' using 1:($2)*230/1000 title 'Electricity' with lines
-
+```
 
 
 TODO:
