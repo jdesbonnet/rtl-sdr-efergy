@@ -25,7 +25,7 @@ set timefmt "%s"     # Input file time format is unix epoc time
 set format x "%R"   # Display time in 24 hour notation on the X axis
 set terminal png
 set output 'electricity.png'
-plot 'electricity.dat' using 1:($2)*230/1000 title 'Electricity' with lines
+plot 'electricity.dat' using 1:($2)*230/1e6 title 'Electricity' with lines
 ```
 
 
