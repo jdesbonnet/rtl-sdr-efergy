@@ -58,7 +58,19 @@ int py=0;
 
 /**
  * Read next sample from rtl_fm (signed 16bit integer, little endian).
+ * This uses zero-crossing technique to extract frequency information
+ * from the data stream.
+ *
  * Update global t, f (length, in samples, of positive half cycle)
+ * The reason I am using just the positive half-cycle is that unless
+ * the waveform is exactly centered you'll get different values for
+ * the positive and negative half cycle. 
+ *
+ * I also tried the obvious full cycle length but found I didn't get
+ * a clean separation of frequencies at frequency transition points.
+ * I might have been measuring 180 degrees out of phase: averaging 
+ * the second half cycle of one frequency with the first half cycle 
+ * of the other frequency. I think this is worth exploring further.
  */
 int get_next_sample () {
 
@@ -158,7 +170,7 @@ int main (int argc, char**argv) {
 			v = get_next_sample();
 		
 
-			// TODO: make sample rate independent.
+			// TODO: make sample rate independent. Currently hard coded to 96ksps
 
 			//if ( v>=((13*SAMPLE_RATE)/48000)  &&  v <= ((17*SAMPLE_RATE)/48000) ) {
 			if ( v>=32  &&  v <= 34 ) {
@@ -199,7 +211,7 @@ int main (int argc, char**argv) {
 
 		// TODO: CRC byte at end still missing.
 
-		// Discard bad frames.
+		// Discard bad frames. Check start of frame for hex values: AB AB AB 2D
 		fprintf (stderr,"sof=%x ", *sof);
 		if (*sof == 0x2dababab) {
 			// End of Frame
