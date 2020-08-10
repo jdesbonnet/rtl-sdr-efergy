@@ -167,6 +167,7 @@ int main (int argc, char**argv) {
 			if (frame_bit==64) {
 				current =  (int)((frame_data>>24)&0xfff);
 				fprintf(stdout,"%d %d\n", (unsigned)time(NULL), current);
+				fflush(stdout);
 				frame_bit=0;
 			}
 
