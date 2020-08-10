@@ -51,6 +51,22 @@
 
 #define SYNC (0xAB2D)
 
+int calc_crc (uint64_t data) {
+	int i,sum=0;
+	uint8_t *c;
+	c = (uint8_t *)&data;
+	for (i = 0; i < 8; i++) {
+		sum += *c;
+		c++;
+	}
+	return sum&0xff;
+}
+
+void output_data (uint64_t data) {
+
+}
+
+
 int main (int argc, char**argv) {
 
 	int i=0,n;
@@ -70,7 +86,11 @@ int main (int argc, char**argv) {
 
 	uint64_t frame_data;
 	int frame_bit;
-	int debug = 2;
+	int frame_crc;
+	int crc = 0;    // in CRC bits of frame
+	int crc_fail_count=0;
+
+	int debug = 0;
 
 	while(!feof(stdin)) {
 
@@ -106,23 +126,23 @@ int main (int argc, char**argv) {
 		// logic 0: 1500Hz = 64samples @ 96ksps
 		// logic 1: 2000Hz = 48 samples @ 96ksps
 
-		if ( (s1 > 0) && (s0 <= 0) ) {
-			// negative to positive crossing
-			zero_cross_t1 = i;
-			
-		} else if ( (s1 < 0) && (s0 >= 0) ) {
+		//if ( (s1 > 0) && (s0 <= 0) ) {
+		if ( (s1 < 0) && (s0 >= 0) ) {
+			// + to - crossing
 
-			// positive to negative crossing
-			// half period
 			period = i - zero_cross_t1;
+			zero_cross_t1 = i;
 
-
-
-
-			if ( (period >= 29) && (period < 35) ) {
-				freq = 1500;
-			} else if ( (period >= 20) && (period < 29) ) {
+			if ( (period >= 40) && (period < 54) ) {
 				freq = 2000;
+			} else if ( (period >= 54) && (period < 64) ) {
+				freq = 1500;
+			} else if ( period > 100 && crc == 1 && frame_bit == 7) {
+				// CRC messy because last bit of CRC does not cross immediately
+				freq = prev_freq;
+				if (debug>1) {
+					fprintf(stderr,"CRC");
+				}
 			} else {
 				freq = -1;
 			}
@@ -142,8 +162,12 @@ int main (int argc, char**argv) {
 			}
 
 			if (symbol >= 0) {
-				if (i - last_symbol_t > 10000) {
-					//fprintf (stderr,"\n");
+				if (debug>1) {
+					fprintf (stderr,"%d",symbol);
+					fflush (stderr);
+				}
+				if (debug>1  && (i - last_symbol_t > 10000) ) {
+					fprintf (stderr,"\n");
 				}
 				run_count = 0;
 				last_symbol_t = i;
@@ -155,19 +179,44 @@ int main (int argc, char**argv) {
 				}
 				frame_bit++;
 				if (frame_sync == SYNC ) {
-					//fprintf (stderr, "SYNC");
+					if (debug>1) {
+						fprintf (stderr, "SYNC");
+					}
 					frame_data=0;
 					frame_bit=0;
+				}
+
+				if (crc == 1 && frame_bit == 8) {
+					if (debug>1) {
+						fprintf (stderr,"crc=%d,%d ",(int)(frame_data&0xff), frame_crc);
+					}
+					
+					//fprintf(stdout,"%d %d %d\n", (unsigned)time(NULL), current,  (int)(frame_data&0xff) == frame_crc ? 1 : 0);
+					if ((int)(frame_data&0xff) == frame_crc) {
+						fprintf(stdout,"%d %d %d\n", (unsigned)time(NULL), current,  crc_fail_count);
+					} else {
+						crc_fail_count++;
+					}
+					fflush(stdout);
+					
+					crc = 0;
 				}
 
 			}
 
 			if (frame_bit==64) {
+				frame_crc = calc_crc(frame_data);
 				current =  (int)((frame_data>>24)&0xfff);
-				fprintf(stderr,"%d %d\n", (unsigned)time(NULL), current);
-				fflush(stderr);
+				//fprintf(stderr,"%d %d\n", (unsigned)time(NULL), current);
+				//fflush(stderr);
+				if (debug>1) {
+					fprintf(stderr,"D");
+				}
 				frame_bit=0;
+				crc = 1;
 			}
+
+
 
 			if (freq == -1) {
 				run_count = 0;
