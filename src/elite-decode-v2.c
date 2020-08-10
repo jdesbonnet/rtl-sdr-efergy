@@ -48,20 +48,26 @@
 #define SAMPLE_RATE (96000)
 #define SAMPLE_SCALE (SAMPLE_RATE/48000)
 
-
+#define SYNC (0xAB2D)
 
 int main (int argc, char**argv) {
 
 	int i=0,n;
 	uint16_t sample;
+	uint16_t frame_sync=0;
 	int lpf=0;
 	int lpf2=0;
-	int lpf3=0;
+	int a=0;
 
 	int s0,s1;
 	int zero_cross_t0, zero_cross_t1;
 	int period;
-	int freq, prev_freq, run_count=0;
+	int freq=2000, prev_freq=1500, run_count=0;
+	int last_symbol_t = 0;
+	int f;
+
+	uint64_t frame_data;
+	int frame_bit;
 
 	while(!feof(stdin)) {
 
@@ -71,33 +77,51 @@ int main (int argc, char**argv) {
 			break;
 		}
 
-		lpf2 += sample;
-		lpf2 -= lpf2/256;
 
-		// Remove 'DC' offset
-		//sample -= lpf2/256;
 
 		lpf += sample;
-		lpf -= lpf/8;
+		lpf -= lpf/4;
 
-		lpf3 += lpf/8;
-		lpf3 -= lpf3/32;
+		f = lpf/4;
 
-		fprintf (stdout,"%d %d %d %d %d\n", i, sample, lpf/8, (lpf/8)-51500 , lpf3/32);
+		lpf2 += f;
+		lpf2 -= lpf2/64;
 
-		s1 = lpf/8 - 51500;
+		// Remove DC
+		f -= lpf2/64;
 
-		if ( (s1 > 0) && (s0 < 0) ) {
+		// amplitude
+		a += (f > 0 ? f: -f);
+		a -= a/256;
+
+		if ((a/256)>2048) {
+			continue;
+		}
+
+		
+
+
+		// logic 0: 1500Hz = 64samples @ 96ksps
+		// logic 1: 2000Hz = 48 samples @ 96ksps
+
+		s1 = f;
+
+		if ( (s1 > 0) && (s0 <= 0) ) {
+			// negative to positive crossing
 			zero_cross_t1 = i;
-			period = zero_cross_t1 - zero_cross_t0;
+			
+		} else if ( (s1 < 0) && (s0 >= 0) ) {
+
+			// positive to negative crossing
+			//zero_cross_t1 = i;
+			period = i - zero_cross_t1;
 
 
-			// logic 0: 1500Hz = 64samples @ 96ksps
-			// logic 1: 2000Hz = 48 samples @ 96ksps
 
-			if ( (period >= 60) && (period < 68) ) {
+
+			if ( (period >= 29) && (period < 35) ) {
 				freq = 1500;
-			} else if ( (period >= 44) && (period < 55) ) {
+			} else if ( (period >= 20) && (period < 29) ) {
 				freq = 2000;
 			} else {
 				freq = -1;
@@ -105,16 +129,51 @@ int main (int argc, char**argv) {
 
 			if (freq == prev_freq) {
 				run_count++;
-			}
+			} else {
+				run_count=1;
+			} 
 
 			if ( (freq == 1500) && (run_count == 3) ) {
+				if (i - last_symbol_t > 10000) {
+					fprintf (stderr,"\n");
+				}
 				fprintf(stderr,"0");
 				run_count = 0;
+				last_symbol_t = i;
+				frame_sync <<= 1;
+				frame_data <<= 1;
+				frame_bit++;
+				if (frame_sync == SYNC ) {
+					fprintf (stderr, "SYNC");
+					frame_data=0;
+					frame_bit=0;
+				}
 			}
 			if ( (freq == 2000) && (run_count == 4) ) {
+				if (i - last_symbol_t > 10000) {
+					fprintf (stderr,"\n");
+				}
 				fprintf(stderr,"1");
 				run_count = 0;
+				last_symbol_t = i;
+				frame_sync <<= 1;
+				frame_sync |= 1;
+				frame_data <<= 1;
+				frame_data |= 1;
+				frame_bit++;
+				if (frame_sync == SYNC ) {
+					fprintf (stderr, "SYNC");
+					frame_data=0;
+					frame_bit=0;
+				}
+
 			}
+
+			if (frame_bit==64) {
+				fprintf(stderr,"[%016lx] mA=%d ", frame_data, (int)((frame_data>>24)&0xfff));
+				frame_bit=0;
+			}
+
 			if (freq == -1) {
 				run_count = 0;
 			}
@@ -128,6 +187,8 @@ int main (int argc, char**argv) {
 
 			zero_cross_t0 = zero_cross_t1;
 		}
+
+		fprintf (stdout,"%d %d %d %d %d %d\n", i, sample, f, lpf2/64, (period<0 ? 0 : period*100), run_count*1000 );
 
 		s0 = s1;
 		i++;
