@@ -60,11 +60,12 @@ int main (int argc, char**argv) {
 	int a=0;
 
 	int s0,s1;
-	int zero_cross_t0, zero_cross_t1;
+	int zero_cross_t1;
 	int period;
 	int freq=2000, prev_freq=1500, run_count=0;
 	int last_symbol_t = 0;
 	int f;
+	int mA;
 
 	uint64_t frame_data;
 	int frame_bit;
@@ -170,7 +171,8 @@ int main (int argc, char**argv) {
 			}
 
 			if (frame_bit==64) {
-				fprintf(stderr,"[%016lx] mA=%d ", frame_data, (int)((frame_data>>24)&0xfff));
+				mA =  (int)((frame_data>>24)&0xfff);
+				fprintf(stderr,"[%016lx] mA=%d W=%f ", frame_data, mA, ((float)mA*240/100000));
 				frame_bit=0;
 			}
 
@@ -181,14 +183,10 @@ int main (int argc, char**argv) {
 			prev_freq = freq;
 			
 
-			//fprintf(stderr,"period=%d freq=%d rc=%d\n",period, freq, run_count);
-
-			//fprintf(stderr,"period=%d freq=%d rc=%d\n",period, freq, run_count);
-
-			zero_cross_t0 = zero_cross_t1;
+			//zero_cross_t0 = zero_cross_t1;
 		}
 
-		fprintf (stdout,"%d %d %d %d %d %d\n", i, sample, f, lpf2/64, (period<0 ? 0 : period*100), run_count*1000 );
+		//fprintf (stdout,"%d %d %d %d %d %d\n", i, sample, f, lpf2/64, (period<0 ? 0 : period*100), run_count*1000 );
 
 		s0 = s1;
 		i++;
