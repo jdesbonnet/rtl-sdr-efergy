@@ -64,32 +64,37 @@ int main (int argc, char**argv) {
 	int zero_cross_t1;
 	int period;
 	int freq=2000, prev_freq=1500, run_count=0;
+	int symbol;
 	int last_symbol_t = 0;
 	int current;
 
 	uint64_t frame_data;
 	int frame_bit;
+	int debug = 2;
 
 	while(!feof(stdin)) {
 
+		// Read next sample: note this is a FM frequency (not raw signal amplitude)
 		n = fread(&sample, 2, 1, stdin);
 		if ( n != 1) {
 			fprintf(stderr,"error reading data n=%d\n",n);
 			break;
 		}
 
+		// smothing filter: is this necessary?
 		lpf += sample;
 		lpf -= lpf/4;
 
 		s1 = lpf/4;
 
+		// used to determine 'DC' component
 		lpf2 += s1;
 		lpf2 -= lpf2/64;
 
-		// Remove DC
+		// remove DC
 		s1 -= lpf2/64;
 
-		// amplitude
+		// amplitude 
 		a += (s1 > 0 ? s1: -s1);
 		a -= a/256;
 
@@ -128,33 +133,26 @@ int main (int argc, char**argv) {
 				run_count=1;
 			} 
 
+			symbol = -1;
 			if ( (freq == 1500) && (run_count == 3) ) {
-				if (i - last_symbol_t > 10000) {
-					//fprintf (stderr,"\n");
-				}
-				//fprintf(stderr,"0");
-				run_count = 0;
-				last_symbol_t = i;
-				frame_sync <<= 1;
-				frame_data <<= 1;
-				frame_bit++;
-				if (frame_sync == SYNC ) {
-					//fprintf (stderr, "SYNC");
-					frame_data=0;
-					frame_bit=0;
-				}
+				symbol = 0;
 			}
 			if ( (freq == 2000) && (run_count == 4) ) {
+				symbol = 1;
+			}
+
+			if (symbol >= 0) {
 				if (i - last_symbol_t > 10000) {
 					//fprintf (stderr,"\n");
 				}
-				//fprintf(stderr,"1");
 				run_count = 0;
 				last_symbol_t = i;
 				frame_sync <<= 1;
-				frame_sync |= 1;
 				frame_data <<= 1;
-				frame_data |= 1;
+				if (symbol == 1) {
+					frame_sync |= 1;
+					frame_data |= 1;
+				}
 				frame_bit++;
 				if (frame_sync == SYNC ) {
 					//fprintf (stderr, "SYNC");
@@ -166,8 +164,8 @@ int main (int argc, char**argv) {
 
 			if (frame_bit==64) {
 				current =  (int)((frame_data>>24)&0xfff);
-				fprintf(stdout,"%d %d\n", (unsigned)time(NULL), current);
-				fflush(stdout);
+				fprintf(stderr,"%d %d\n", (unsigned)time(NULL), current);
+				fflush(stderr);
 				frame_bit=0;
 			}
 
@@ -179,7 +177,9 @@ int main (int argc, char**argv) {
 
 		}
 
-		//fprintf (stdout,"%d %d %d %d %d %d\n", i, sample, f, lpf2/64, (period<0 ? 0 : period*100), run_count*1000 );
+		if (debug>1) {
+			fprintf (stdout,"DEBUG %d %d %d %d %d %d %d\n", i, sample, s1, lpf2/64, (period<0 ? 0 : period*100), run_count*1000,frame_bit*100 );
+		}
 
 		s0 = s1;
 		i++;
